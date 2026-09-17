@@ -9,52 +9,27 @@
 ```js
 class EventEmitter {
   constructor() {
-    // 事件中心：{ 事件名: [回调1, 回调2, ...] }
     this.events = {};
   }
 
-  // 订阅事件
-  on(event, callback) {
-    if (!this.events[event]) {
-      this.events[event] = [];
-    }
-    this.events[event].push(callback);
-    return this; // 支持链式调用
+  on(event, fn) {
+    (this.events[event] ||= []).push(fn);
   }
 
-  // 订阅一次，触发后自动移除
-  once(event, callback) {
-    const wrapper = (...args) => {
-      callback.apply(this, args);
-      this.off(event, wrapper);
-    };
-    wrapper.originCallback = callback; // 保存原回调，便于 off 匹配
-    this.on(event, wrapper);
-    return this;
-  }
-
-  // 发布事件
   emit(event, ...args) {
-    const callbacks = this.events[event];
-    if (!callbacks || callbacks.length === 0) return false;
-    // 复制一份，避免回调中 off 导致遍历异常
-    callbacks.slice().forEach((cb) => cb.apply(this, args));
-    return true;
+    this.events[event]?.forEach((fn) => fn(...args));
   }
 
-  // 取消订阅
-  off(event, callback) {
-    const callbacks = this.events[event];
-    if (!callbacks) return this;
-    if (!callback) {
-      // 不传回调则移除该事件所有订阅
-      delete this.events[event];
-    } else {
-      // 同时匹配 once 包装后的回调与原回调
-      const index = callbacks.findIndex((cb) => cb === callback || cb.originCallback === callback);
-      if (index !== -1) callbacks.splice(index, 1);
-    }
-    return this;
+  off(event, fn) {
+    this.events[event] = this.events[event]?.filter((f) => f !== fn);
+  }
+
+  once(event, fn) {
+    const wrapper = (...args) => {
+      fn(...args); // 执行原函数
+      this.off(event, wrapper); // 执行完就移除自己
+    };
+    this.on(event, wrapper);
   }
 }
 ```
@@ -64,26 +39,20 @@ class EventEmitter {
 ```js
 const bus = new EventEmitter();
 
-// 订阅
-function onLogin(user) {
-  console.log(`欢迎，${user.name}！`);
+function fn(user) {
+  console.log('普通：', user.name);
 }
 
-bus.on('login', onLogin);
+bus.on('login', fn);
 
-bus.once('login', () => {
-  console.log('这是一次性订阅，只触发一次');
+bus.once('login', (user) => {
+  console.log('一次性：', user.name);
 });
 
-// 发布
 bus.emit('login', { name: '张三' });
-// 欢迎，张三！
-// 这是一次性订阅，只触发一次
+// 普通：张三
+// 一次性：张三
 
 bus.emit('login', { name: '李四' });
-// 欢迎，李四！
-
-// 取消订阅
-bus.off('login', onLogin);
-console.log(bus.emit('login', { name: '王五' })); // false，已无订阅者
+// 普通：李四
 ```
