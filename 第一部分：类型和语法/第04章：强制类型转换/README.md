@@ -58,7 +58,7 @@ var a = [1,2,3];
 a.toString(); // "1,2,3"
 ```
 toString() 可以被显式调用，或者在需要字符串化时自动调用。
-### JSON 字符串化
+### 4.2.1.1 JSON 字符串化
 
 工具函数 JSON.stringify(..) 在将 JSON 对象序列化为字符串时也用到了 ToString。
 
@@ -198,6 +198,57 @@ JSON.stringify(a, null, "-----");
 -----]
 }"
 ```
+## 4.2.2 ToNumber
+
+有时我们需要将非数字值当作数字来使用，比如数学运算。为此 ES5 规范在 9.3 节定义了抽象操作 ToNumber。
+
+其中 true 转换为 1，false 转换为 0。undefined 转换为 NaN，null 转换为 0。
+
+ToNumber 对字符串的处理基本遵循数字常量的相关规则/语法（参见第 3 章）。处理失败时返回 NaN（处理数字常量失败时会产生语法错误）。不同之处是 ToNumber 对以 0 开头的八进制并不按八进制处理（而是按十进制，参见第 2 章）。
+>数字常量的语法规则与 ToNumber 处理字符串所遵循的规则之间差别不大，这里不做进一步介绍，可参考 ES5 规范的 9.3.1 节。
+
+对象（包括数组）会首先被转换为相应的基本类型值，如果返回的是非数字的基本类型值，则再遵循以上规则将其强制转换为数字。
+
+为了将值转换为相应的基本类型值，抽象操作 ToPrimitive（参见 ES5 规范 9.1 节）会首先（通过内部操作 DefaultValue，参见 ES5 规范 8.12.8 节）检查该值是否有 valueOf() 方法。如果有并且返回基本类型值，就使用该值进行强制类型转换。如果没有就使用 toString() 的返回值（如果存在）来进行强制类型转换。
+
+如果 valueOf() 和 toString() 均不返回基本类型值，会产生 TypeError 错误。
+
+从 ES5 开始，使用 Object.create(null) 创建的对象 `[[Prototype]]` 属性为 null，并且没有 valueOf() 和 toString() 方法，因此无法进行强制类型转换。详情请参考本系列的《你不知道的 JavaScript（上卷）》“this 和对象原型”部分中`[[Prototype]]` 相关部分。
+>我们稍后将详细介绍数字的强制类型转换，在下面的示例代码中我们假定 Number(..) 已经实现了此功能。
+
+例如：
+```javascript
+var a = {
+	valueOf: function() {
+		return "42";
+	}
+};
+
+var b = {
+	toString: function() {
+	return "42";
+	}
+};
+
+var c = [4, 2];
+
+c.toString = function() {
+	return this.join(""); // "42"
+};
+
+Number(a); // 42
+Number(b); // 42
+Number(c); // 42
+Number(""); // 0
+Number([]); // 0
+Number([ "abc" ]); // NaN
+```
+
+
+
+
+
+
 
 
 
