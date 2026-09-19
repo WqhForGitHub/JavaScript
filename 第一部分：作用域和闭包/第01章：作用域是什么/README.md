@@ -175,7 +175,9 @@ foo(2); // 4
 ## 把作用域链比喻成一个建筑
 
 为了将作用域处理的过程可视化，我希望你在脑中想象下面这个高大的建筑：
-![把作用域链比喻成一个建筑](https://front-end-1257950569.cos.ap-guangzhou.myqcloud.com/%E4%BD%A0%E4%B8%8D%E7%9F%A5%E9%81%93%E7%9A%84%20JavaScript%EF%BC%88%E4%B8%8A%E5%8D%B7%EF%BC%89/%E7%AC%AC01%E7%AB%A0%EF%BC%9A%E4%BD%9C%E7%94%A8%E5%9F%9F%E6%98%AF%E4%BB%80%E4%B9%88/%E6%8A%8A%E4%BD%9C%E7%94%A8%E5%9F%9F%E9%93%BE%E6%AF%94%E5%96%BB%E6%88%90%E4%B8%80%E4%B8%AA%E5%BB%BA%E7%AD%91.png)
+![把作用域链比喻成一个建筑](https://front-end-1257950569.cos.ap-guangzhou.myqcloud.com/%E4%BD%A0%E4%B8%8D%E7%9F%A5%E9%81%93%E7%9A%84%20JavaScript%EF%BC%88%E4%B8%8A%E5%8D%B7%EF%BC%89/%E7%AC%AC%E4%B8%80%E9%83%A8%E5%88%86%EF%BC%9A%E4%BD%9C%E7%94%A8%E5%9F%9F%E5%92%8C%E9%97%AD%E5%8C%85/%E7%AC%AC01%E7%AB%A0%EF%BC%9A%E4%BD%9C%E7%94%A8%E5%9F%9F%E6%98%AF%E4%BB%80%E4%B9%88/%E6%8A%8A%E4%BD%9C%E7%94%A8%E5%9F%9F%E9%93%BE%E6%AF%94%E5%96%BB%E6%88%90%E4%B8%80%E4%B8%AA%E5%BB%BA%E7%AD%91.png)
+图一：把作用域链比喻成一个建筑
+
 这个建筑代表程序中的嵌套作用域链。第一层代表当前的执行作用域，也就是你所处的位置、建筑的顶层代表全局作用域。
 
 LHS 和 RHS 引用都会在当前楼层进行查找，如果没有找到，就会坐电梯前往上一层楼，如果还是没有找到就继续向上，以此类推。一旦抵达顶层（全局作用域），可能找到了你所需的变量，也可能没找到，但无论如何查找过程都将停止。

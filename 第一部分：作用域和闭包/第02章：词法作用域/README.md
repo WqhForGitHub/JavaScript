@@ -22,7 +22,7 @@ function foo(a) {
 foo(2); // 2, 4, 12
 ```
 在这个例子中有三个逐级嵌套的作用域，为了帮助理解，可以将它们想象成几个逐级包含的气泡。
-![词法作用域](https://front-end-1257950569.cos.ap-guangzhou.myqcloud.com/%E4%BD%A0%E4%B8%8D%E7%9F%A5%E9%81%93%E7%9A%84%20JavaScript%EF%BC%88%E4%B8%8A%E5%8D%B7%EF%BC%89/%E7%AC%AC02%E7%AB%A0%EF%BC%9A%E8%AF%8D%E6%B3%95%E4%BD%9C%E7%94%A8%E5%9F%9F/%E8%AF%8D%E6%B3%95%E4%BD%9C%E7%94%A8%E5%9F%9F.png)
+![词法作用域](https://front-end-1257950569.cos.ap-guangzhou.myqcloud.com/%E4%BD%A0%E4%B8%8D%E7%9F%A5%E9%81%93%E7%9A%84%20JavaScript%EF%BC%88%E4%B8%8A%E5%8D%B7%EF%BC%89/%E7%AC%AC%E4%B8%80%E9%83%A8%E5%88%86%EF%BC%9A%E4%BD%9C%E7%94%A8%E5%9F%9F%E5%92%8C%E9%97%AD%E5%8C%85/%E7%AC%AC02%E7%AB%A0%EF%BC%9A%E8%AF%8D%E6%B3%95%E4%BD%9C%E7%94%A8%E5%9F%9F/%E8%AF%8D%E6%B3%95%E4%BD%9C%E7%94%A8%E5%9F%9F.png)
 图一 词法作用域
 1. 包含着整个全局作用域，其中只有一个标识符：foo
 2. 包含着 foo 所创建的作用域，其中有三个标识符：a、bar 和 b
