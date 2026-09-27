@@ -281,6 +281,117 @@ ES6 支持以下新格式：
 0B11110011; // 同上
 ```
 考虑到代码的易读性，不推荐使用 0O363 格式，因为 0 和大写字母 O 在一起容易混淆。建议尽量使用小写的 0x、0b、0o。
+## 2.3.2 较小的数值
+
+二进制浮点数最大的问题（不仅 JavaScript，所有遵循 IEEE 754 规范的语言都是如此），是会出现如下情况：
+```javascript
+0.1 + 0.2 === 0.3; // false
+```
+从数学角度来说，上面的条件判断应该为 true，可结果为什么是 false 呢？
+
+简单来说，二进制浮点数中的 0.1 和 0.2 并不是十分精确，它们相加的结果并非刚好等于 0.3，而是一个比较接近的数字 0.30000000000000004，所以条件判断结果为 false。
+>有人认为，JavaScript 应该采用一种可以精确呈现数字的实现方式。一直以来出现过很多替代方案，只是都没能成为标准，以后大概也不会。这个问题看似简单，实则不然，否则早就解决了。
+
+问题是，如果一些数字无法做到完全精确，是否意味着数字类型毫无用处呢？答案当然是否定的。
+
+在处理带有小数的数字时需要特别注意。很多（也许是绝大多数）程序只需要处理整数，最大不超过百万或者万亿，此时使用 JavaScript 的数字类型是绝对安全的。
+
+那么应该怎样来判断 0.1 + 0.2 和 0.3 是否相等呢？
+
+最常见的方法是设置一个误差范围值，通常称为 “机器精度”（machine epsilon），对 JavaScript 的数字来说，这个值通常是 `2^-52`（0.220446049250313e-16）。
+
+从 ES6 开始，该值定义在 `Number.EPSILON` 中，我们可以直接拿来用，也可以为 ES6 之前的版本写 polyfill：
+```javascript
+if (Number.EPSILON) {
+	Number.EPSILON = Math.pow(2, -52);
+}
+```
+可以使用 Number.EPSILON 来比较两个数字是否相等（在指定的误差范围内）：
+```javascript
+function numbersCloseEnoughToEqual(n1, n2) {
+	return Math.abs(n1 - n2) < Number.EPSILON;
+}
+
+var a = 0.1 + 0.2;
+var b = 0.3;
+
+numbersCloseEnoughToEqual(a, b); // true
+numbersCloseEnoughToEqual(0.0000001, 0.0000002); // false
+```
+能够呈现的最大浮点数大约是 1.798e+308（这是一个相当大的数字），它定义在 Number.MAX_VALUE 中。最小浮点数定义在 Number.MIN_VALUE 中，大约是 5e-324，它不是负数，但无限接近于 0。
+## 2.3.3 整数的安全范围
+
+数字的呈现方式决定了 “整数” 的安全性范围远远小于 Number.MAX_VALUE。
+
+能够被 “安全” 呈现的最大整数是 2^53 - 1，即 9007199254740991，在 ES6 中被定义为 Number.MAX_SAFE_INTEGER。最小整数是 -9007199254740991，在 ES6 中被定义为 Number.MIN_SAFE_INTEGER。
+
+有时 JavaScript 程序需要处理一些比较大的数字，如数据库中的 64 位 ID 等。由于 JavaScript 的数字类型无法精确呈现 64 位数值，所以必须将它们保存（转换）为字符串。
+
+好在大数值操作并不常见（它们的比较操作可以通过字符串案例实现）。如果确实需要对大数值进行数学运算，目前还是需要借助相关的工具库。将来 JavaScript 也许会加入对大数值的支持。
+## 2.3.4 整数检测
+ 
+要检测一个值是否是整数，可以使用 ES6 中的 Number.isInteger(..) 方法：
+```javascript
+Number.isInteger(42); // true
+Number.isInteger(42.000); // true
+Number.isInteger(42.3); // false
+```
+也可以为 ES6 之前的版本 polyfill Number.isInteger(..) 方法：
+```javascript
+if (!Number.isInteger) {
+	Number.isInteger = function(num) {
+		return typeof num == "number" && num % 1 == 0;
+	}
+}
+```
+要检测一个值是否是安全的整数，可以使用 ES6 中的 Number.isSafeInteger(..) 方法：
+```javascript
+Number.isSafeInteger(Number.MAX_SAFE_INTEGER); // true
+Number.isSafeInteger(Math.pow(2, 53)); // false
+Number.isSafeInteger(Math.pow(2, 53) - 1); // true
+```
+可以为 ES6 之前的版本 polyfill Number.isSafeInteger(..) 方法：
+```javascript
+if (!Number.isSafeInteger) {
+	Number.isSafeInteger = function(num) {
+		return Number.isInteger(num) &&
+			Math.abs(num) <= Number.MAX_SAFE_INTEGER
+	}
+}
+```
+## 2.3.5 32 位有符号整数
+
+虽然整数最大能够达到 53 位，但是有些数字操作（如数位操作）只适用于 32 位数字，所以这些操作中数字的安全范围就要小很多，变成从 Math.pow(-2, 31)（-2147483648，约 -21 亿元）到 Math.pow(2, 31) - 1（2147483647，约 21 亿）。
+
+a | 0 可以将变量 a 中的数值转换为 32 位有符号整数，因为数位运算符 `|` 只适用于 32 位整数（它只关心 32 位以内的值，其他的数位将被忽略）。因此与 0 进行 OR 操作本质上没有意义。
+>某些特殊的值并不是 32 位安全范围的，如 NaN 和 Infinity（下节将作相关介绍），此时会对它们执行虚拟操作（abstract operation）ToInt32（参见第 4 章），以便转换为符合数位运算符要求的 +0 值。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
