@@ -130,7 +130,7 @@ async function copyPageUrl() {
 	}
 }
 ```
-# 4.4 Clipboard.write()
+## 4.4 Clipboard.write()
 
 `Clipboard.write()` 方法用于将任意数据写入剪贴板，可以是文本数据，也可以是二进制数据。
 
