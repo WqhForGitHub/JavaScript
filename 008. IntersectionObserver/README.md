@@ -50,6 +50,7 @@ var observer = new IntersectionObserver((entries, observer) => {
 ## 2.2 IntersectionObserverEntry 对象
 
 `IntersectionObserverEntry` 对象提供目标元素的信息，一共有六个属性。
+
 ```json
 {
 	time: 3893.92,
@@ -71,6 +72,7 @@ var observer = new IntersectionObserver((entries, observer) => {
 	target: element
 }
 ```
+
 每个属性的含义如下。
 
 - `time`：可见性发生变化的时间，是一个高精度时间戳，单位为毫秒
