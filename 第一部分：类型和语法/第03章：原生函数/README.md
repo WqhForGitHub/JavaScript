@@ -99,6 +99,378 @@ var b = a + ""; // b 的值为 "abc"
 typeof a; // "object"
 typeof b; // "string"
 ```
+# 3.4 原生函数作为构造函数
+
+关于数组（array）、对象（object）、函数（function）和正则表达式，我们通常喜欢以字面量的形式来创建它们。实际上，使用字面量和使用构造函数的效果是一样的（创建的值都是通过封装对象来包装）。
+## 3.4.1 Array(..)
+```javascript
+var a = new Array(1, 2, 3);;
+a; // [1, 2, 3]
+
+var b = [1, 2, 3];
+b; // [1, 2, 3]
+```
+>构造函数 Array(..) 不要求必须带 new 关键字。不带时，它会被自动补上。因此 Array(1, 2, 3) 和 new Array(1, 2, 3) 的效果是一样的。
+
+Array 构造函数只带一个数字参数的时候，该参数会被作为数组的预设长度（length），而非只充当数组中的一个元素。
+
+这实非明智之举：一是容易忘记，二是容易出错。
+
+更为关键的是，数组并没有预设长度这个概念。这样创建出来的只是一个空数组，只不过它的 length 属性被设置成了指定的值。
+
+如若一个数组没有任何单元，但它的 length 属性中却显示有单元数量，这样奇特的数据结构会导致一些怪异的行为。而这一切都归咎于已被废止的旧特性（类似 arguments 这样的类数组）。
+>我们将包含至少一个“空单元”的数组称为”稀疏数组“。
+
+对此，不同浏览器的开发控制台显示的结果也不尽相同，这比问题变得更加复杂。
+
+例如：
+```javascript
+var a = new Array(3);
+
+a.length; // 3
+a;
+```
+a 在 Chrome 中显示为 `[undefined ⨉ 3]`（目前为止），这意味着它有三个值为 undefined 的单元，但实际上单元并不存在（”空单元“ 这个叫法也同样不准确）。
+
+从下面代码的结果可以看出它们的差别：
+```javascript
+var a = new Array(3);
+var b = [undefined, undefined, undefined];
+var c = [];
+c.length = 3;
+
+a;
+b;
+c;
+```
+>我们可以创建包含空单元的数组，如上例中的 c。只要将 length 属性设置为超过实际单元数的值，就能隐式地制造出空单元。另外还可以通过 `delete b[1]` 在数组中 b 中制造出一个空单元。
+
+b 在当前版本的 Chrome 中示为 `[undefined, undefined, undefined]`，而 a 和 c 则显示为 `[undefined ⨉ 3]`。是不是感到很困惑？
+
+更令人费解的是在当前版本的 Firefox 中 a 和 c 显示为 `[ , , , ]`。仔细看来，这其中有三个逗号，代表四个空单元，而不是三个。
+
+Firefox 在输出结果后面多添了一个 `,`。原因是从 ES5 规范开始就允许在列表（数组值、属性列表等）末尾多加一个逗号（在实际处理中会被忽略不计）。所以如果你在代码或者调试控制台中输入 `[ , , , ]`，实际上得到的是 `[ , , ]`（包含三个空单元的数组显）。这样做虽然在控制台中看似令人费解，实则是为了让复制粘贴结果更为准确。
+
+读到这里你或许已是一头雾水，但没关系，打起精神，你不是一个人在战斗。
+
+>针对这种情况，Firefox 将 `[ , , , ]` 改为显示 `Array [<3 empty slots>]`，这无疑是个很大的提升。
+
+更糟糕的是，上例中 a 和 b 的行为有时相同，有时又大相径庭：
+```javascript
+a.join("-"); // "--"
+b.join("-"); // "--"
+
+a.map(function(v,i) { return i; }); // [ undefined ⨉ 3 ]
+b.map(function(v,i) { return i; }); // [0 , 1, 2]
+```
+`a.map(..)` 之所以失败，是因为数组中并不存在任何单元，所以 `map(..)` 无从遍历。而 `join(..)` 却不一样，它的具体实现可参考下面的代码：
+```javascript
+function fakeJoin(arr, connector) {
+	var str = "";
+	for (var i = 0; i < arr.length; i++) {
+		if (i > 0) {
+			str += connector;
+		}
+		
+		if (arr[i] !== undefined) {
+			str += arr[i];
+		}
+	}
+	return str;
+}
+
+var a = new Array(3);
+fakeJoin(a, "-"); // "--"
+```
+从中可以看出，`join(..)` 首先假定数组不为空，然后通过 length 属性值来遍历其中的元素。而 `map(..)` 并不做这样的假定，因此结果也往往在预期之外，并可能导致失败。
+
+我们可以通过下述方式来创建包含 undefined 单元（而非“空单元”）的数组：
+```javascript
+var a = Array.apply(null, { length: 3 });
+a; // [undefined, undefined, undefined]
+```
+上述代码或许会引起困惑，下面大致解释一下。
+`apply(..)` 是一个工具函数，适用于所有函数对象，它会以一种特殊的方式来调用传递给它的函数。
+
+第一个参数是 this 对象（《你不知道的 JavaScript（上卷）》的 “this 和对象原型” 部分中有相关介绍），这里不用太过费心了，暂将它设为 null。第二个参数则必须是一个数组（或者类似数组的值，也叫作类数组对象，array-like object），其中的值被用作函数的参数。
+
+于是 `Array.apply()` 调用 `Array(..)` 函数，并且将 `{ length: 3 }` 作为函数的参数。
+
+我们可以设想 `apply(..)` 内部有一个 for 循环（与上述 `join(..)` 类似），从 0 开始循环到 length（即循环到 2， 不包括 3）。
+
+假设在 `apply(..)` 内部该数组参数名为 arr，for 循环就会这样来遍历数组：`arr[0]`、`arr[1]`、`arr[2]`。然而，由于 `{ length: 3 }` 中并不存在这些属性，所以返回值为 undefined。
+
+换句话说，我们执行的实际上是 `Array(undefined, undefined, undefined)`，所以结果是单元值为 undefined 的数组，而非空单元数组。
+
+虽然 `Array.apply(null, { length: 3 })` 在创建 undefined 值的数组时有些奇怪和繁琐，但是其结果远比 `Array(3)` 更准确可靠。
+
+总之，永远不要创建和使用空单元数组。
+## 3.4.2 Object(..)、Function(..) 和 RegExp(..)
+
+同样，除非万不得已，否则尽量不要使用 Object(..)/Function(..)/RegExp(..)：
+```javascript
+var c = new Object();
+c.foo = "bar";
+c; // { foo: "bar" }
+
+var d = { foo: "bar" };
+d; // { foo: "bar" }
+
+var e = new Function("a", "return a * 2;");
+var f = function(a) { return a * 2 };
+function g(a) { return a * 2; }
+
+var h = new RegExp("^a*b+", "g");
+var i = /^a*b+/g;
+```
+在实际情况中没有必要使用 `new Object()` 来创建对象，因为这样就无法像常量形式那样一次设定多个属性，而必须逐一设定。
+
+构造函数 Function 只在极少数情况下很有用，比如动态定义函数参数和函数体的时候。不要把 `Function(..)` 当作 `eval(..)` 的替代品，你基本上不会通过这种方式来定义函数。
+
+强烈建议使用常量形式（如 `/^a*b+/g`）来定义正则表达式，这样不仅语法简单，执行效率也更高，因为 JavaScript 引擎在代码执行前会对它们进行预编译和缓存。与前面的构造函数不同，`RegExp(..)` 有时还是很有用的，比如动态定义正则表达式时：
+```javascript
+var name = "Kyle";
+var namePattern = new RegExp("\\b(?:" + name + ")+\\b", "ig");
+
+var matches = someText.match(namePattern);
+```
+上述情况在 JavaScript 编程中有发生，这时 `new RegExp("pattern", "flags")`就能派上用场。
+## 3.4.3 Date(..) 和 Error(..)
+
+相较于其他原生构造函数，`Date(..)` 和 `Error(...)` 的用处要大很多，因为没有对应的常量形式来作为它们的替代。
+
+创建日期对象必须要使用 `new Date()`。`Date(..)` 可以带参数，用来指定日期和时间，而不带参数的话则使用当前的日期和时间。
+
+目前，你构建一个日期对象的最常见理由是要获得当前的 Unix 时间戳（从 1970 年 1 月 1 日开始计算，以秒为单位）。该值可以通过日期对象中的 `getTime()` 来获得。
+
+从 ES5 开始引入了一个更简单的方法，即静态函数 `Date.now()`。对 ES5 之前的版本我们可以使用下面的 polyfill：
+```javascript
+if (!Date.now) {
+	Date.now = function() {
+		return (new Date()).getTime();
+	};
+}
+```
+>如果要调用 `Date()` 时不带 new 关键字，则会得到当前日期的字符串值。其具体格式规范没有规定，浏览器使用 "Fri Jul 18 2014 00:31:02 GMT-0500（CDT）" 这样的格式来显示。
+
+构造函数 `Error(..`)（与前面的 `Array()` 类似）带不带 new 关键字即可。
+
+创建错误对象（error object）主要是为了获得当前运行栈的上下文（大部分 JavaScript 引擎通过只读属性 `.stack` 来访问）。栈上下文信息包括函数调用栈信息和产生错误的代码行号，以便于调试（debug）。
+
+错误对象通常与 throw 一起使用：
+```javascript
+function foo(x) {
+	if (!x) {
+		throw new Error("x wasn't provided");
+	}
+	// ..
+}
+```
+通常错误对象至少包含一个 message 属性，有时也不乏其他属性（必须作为只读属性访问），如 type。除了访问 stack 属性以外，最好的办法是调用（显式调用或者通过强制类型转换隐式调用，参见第 4 章）`toString()` 来获得经过格式化的便于阅读的错误信息。
+>除 `Error(..)` 之外，还有一些针对特定错误类型的原生构造函数，如 `EvalError(..)`、`RangeError(..)`、`ReferenceError(..)`、`SyntaxError(..)`、`TypeError()`、和 `URIError(..)`。这些构造函数很少被直接使用，它们在程序发生异常（比如在使用未声明的变量产生 ReferenceError 错误）时会被自动调用。
+
+## 3.4.4 Symbol(..)
+
+ES6 中新加入了一个基本数据类型，符号（Symbol）。符号是具有唯一性的特殊值（并非绝对），用它来命名对象属性不容易导致重名。该类型的引入主要源于 ES6 的一些特殊构造，此外符号也可以自行定义。
+
+符号可以用作属性名，但无论是在代码还是开发者控制台中都无法查看和访问它的值，只会显示为诸如 `Symbol(Symbol.create)` 这样的值。
+
+ES6 中有些预定义符号，以 Symbol 的静态属性形式出现，如 Symbol.create、Symbol.iterator 等，可以这样来使用：
+```javascript
+obj[Symbol.iterator] = function() { /*..*/ }
+```
+我们剋使用 `Symbol(..)` 原生构造函数来自定义符号。但它比较特殊，不能带 new 关键字，否则会出错：
+```javascript
+var mysym = Symbol("my own symbol");
+mysym; // Symbol(my own symbol)
+mysym.toString(); // "Symbol(my own symbol)"
+typeof mysym; // "symbol"
+
+var a = {};
+a[mysym] = "foobar";
+
+Object.getOwnPropertySymbols(a);
+// [Symbol(my own symbol)]
+```
+虽然符号实际上并非私有属性（通过 `Object.getOwnPropertySymbols(..)`）便可以公开获得对象中的所有符号），但它却主要用于私有或特殊属性。很多开发人员喜欢用它来替代有下划线（`_`）前缀的属性，而下划线前缀通常用于命名私有或特殊属性。
+>符号并非对象，而是一种简单标量基本类型。
+
+## 3.4.5 原生原型
+
+原生构造函数有自己的 `.prototype` 对象，如 `Array.prototype`、`String.prototype` 等。
+
+这些对象包含其对应子类型所特有的行为特征。
+
+例如，将字符串值封装为字符串对象之后，就能访问 `String.prototype` 中定义的方法。
+
+>根据文档约定，我们将 `String.prototype.XYZ` 简写为 `String#XYZ`，对其他 `.prototype` 也同样如此。
+
+- `String#indexOf(..)`
+
+在字符串中找到指定子字符串的位置
+
+- `String#charAt(..)`
+
+获得字符串指定位置上的字符
+
+- `String#substr(..)、String#substring(..) 和 String#slice(..)`
+
+获得字符串的指定部分
+
+- `String#toUpperCase()` 和 `String#toLowerCase()`
+
+将字符串转换为大写或小写
+
+- `String#trim()`
+
+去掉字符串前后的空格，返回新的字符串。
+
+以上方法并不改变原字符串的值，而是返回一个新字符串。
+
+借助原型代理（prototype delegation，参见《你不知道的 JavaScript（上卷）》的 “this 和对象原型“ 部分），所有字符串都可以访问这些方法：
+```javascript
+var a = " abc ";
+
+a.indexOf("c"); // 3
+a.toUpperCase(); // " ABC "
+a.trim(); // "abc"
+```
+其他构造函数的原型包含它们各自类型所特有的行为特征，比如 `Number#toFixed(..)`（将数字转换为指定长度的整数字符串）和 `Array#concat(..)`（合并数组）。所有的函数都可以调用 `Function.prototype` 中的 `apply(..)`、`call(..)` 和 `bind(..)`。
+
+然而，有些原生原型（native prototype）并非 ”纯对象“：
+```javascript
+typeof Function.prototype; // "function"
+Function.prototype(); // 空函数
+
+RegExp.prototype.toString(); // "/(?:)/"
+"abc".match(RegExp.prototype); // [""]
+```
+更糟糕的是，我们甚至可以修改它们（而不仅仅是添加属性）：
+```javascript
+Array.isArray(Array.prototype); // true
+Array.prototype.push(1, 2, 3); // 3
+Array.prototype; // [1, 2, 3]
+
+// 需要将 Array.prototype 设置回空，否则会导致问题
+Array.prototype.length = 0;
+```
+这里，`Function.prototype` 是一个函数，`RegExp.prototype` 是一个正则表达式，而 `Array.prototype` 是一个数组。是不是很有意思？
+### 3.4.5.1 将原型作为默认值
+
+`Function.prototype` 是一个空函数，`RegExp.prototype` 是一个 ”空” 的正则表达式（无任何匹配），而 `Array.prototype` 是一个空数组。对未赋值的变量来说，它们是很好的默认值。
+
+例如：
+```javascript
+function isThisCool(vals, fn, rx) {
+	vals = vals || Array.prototype;
+	fn = fn || Function.prototype;
+	rx = rx || RegExp.prototype;
+	
+	return rx.test(
+		vals.map(fn).join("")
+	)
+}
+
+isThisCool(); // true
+isThisCool(
+	["a", "b", "c"],
+	function(v) { return v.toUpperCase(); },
+	/D/
+); // false
+```
+>从 ES6 开始，我们不再需要使用 vals = vals || .. 这样的方式来设置默认值（参见第 4 章），因为默认值可能通过函数声明中的内置语法来设置（参见第 5 章）。
+
+这种方法的一个好处是 `.prototype` 已被创建并且仅创建一次。相反，如果将 `[]`、`function(){}` 和 `/(?:)` 作为默认值，则每次调用 `isThisCool(..)` 时它们都会被创建一次（具体创建与否取决于 JavaScript 引擎，稍后它们可能会被垃圾回收），这样无疑会造成内存和 CPU 资源的浪费。
+
+另外需要注意的一点是，如果默认值随后会被更改，那就不要使用 `Array.prototype`。上例中的 `vals`是作为只读变量来使用，更改 `vals` 实际上就是更改 `Array.prototype`，而这样会导致前面提到过的一系列问题。
+>以上我们介绍了原生原型及其用途，使用它们时要十分小心，特别是要对它们进行更改时。详情请见本部分附录 A 中的 A.4 节。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
