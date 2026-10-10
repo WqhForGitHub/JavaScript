@@ -735,6 +735,103 @@ parseInt("0x10"); // 16
 parseInt("103", 2); // 2
 ```
 其实 `parseInt(..)` 函数是十分靠谱的，只要使用得当就不会有问题。因为使用不当而导致一些莫名其妙的结果，并不能归咎于 JavaScript 本身。
+## 4.3.3 显式转换为布尔值
+
+现在我们来看看从非布尔值强制类型转换为布尔值的情况。
+
+与前面的 `String(..)` 和 `Number(..)` 一样，`Boolean(..)`（不带 new）是显式的 ToBoolean 强制类型转换：
+```javascript
+var a = "0";
+var b = [];
+var c = {};
+
+var d = "";
+var e = 0;
+var f = null;
+var g;
+
+Boolean(a); // true
+Boolean(b); // true
+Boolean(c); // true
+ 
+Boolean(d); // false
+Boolean(e); // false
+Boolean(f); // false
+Boolean(g); // false
+```
+虽然 `Boolean(..)` 是显式的，但这不常用。
+
+和前面讲过的 `+` 类似，一元运算符 `!` 显式地将值强制类型转换为布尔值。但是它同时还将真值反转为假值（或者将假值反转为真值）。所以显式强制类型转换为布尔值最常用的方法是 `!!`，因为第二个 `!` 会将结果反转回原值：
+```javascript
+var a = "0";
+var b = [];
+var c = {};
+
+var d = "";
+var e = 0;
+var f = null;
+var g;
+
+!!a; // true
+!!b; // true
+!!c; // true
+
+!!d; // false
+!!e; // false
+!!f; // false
+!!g; // false
+```
+在 `if(..)..` 这样的布尔值上下文中，如果没有使用 `Boolean(..)` 和 `!!`，就会自动隐式地进行 `ToBoolean` 转换。建议使用 `Boolean(..)` 和 `!!` 来进行显式转换以便让代码更清晰易读。
+
+显式 `ToBoolean` 的另外一个用处，是在 JSON 序列化过程中将值强制类型转换为 `true` 或 `false`：
+```javascript
+var a = [
+	1,
+	function() { /*..*/ },
+	2,
+	function() { /*..*/ }
+];
+
+JSON.stringify(a); // "[1, null, 2, null]"
+
+JSON.stringify(a, function(key, val) {
+	if (typeof val == "function") {
+		// 函数的 ToBoolean 强制类型转换
+		return !!val;
+	} else {
+		return val;
+	}
+});
+
+// "[1, true, 2, true]"
+```
+下面的语法对于熟悉 Java 的人并不陌生：
+```javascript
+var a = 42;
+
+var b = a ? true : false;
+```
+三元运算符 `?:` 判断 `a` 是否为真，如果是则将变量 b 赋值为 true，否则赋值为 false。
+
+表面上这是一个显式的 `ToBoolean` 强制类型转换，因为返回结果式 true 或 false。
+
+然而这里涉及隐式强制类型转换，因为 `a` 要首先被强制类型转换为布尔值才能进行条件判断。这种情况称为 “显式的隐式”，有百害而一益，我们应彻底杜绝。
+
+建议使用 `Boolean(a)` 和 `!!a` 来进行显式强制类型转换。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
