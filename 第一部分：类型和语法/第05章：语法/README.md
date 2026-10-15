@@ -805,8 +805,66 @@ function foo(a) {
 以上观点并非一家之言。JavaScript 的作者 Brendan Eich 早在 2012 年就说过这样的话：
 >ASI 是一个语法纠错机制。若将换行符当作有意义的字符来对待，就会遇到很多问题。多希望在 1995 年 5 月的那十天里（ECMAScript 规范制定期间），我让换行符承载了更多的意义。但切勿认为 ASI 真的会将换行符当作有意义的字符。
 
+# 5.4 错误
 
+JavaScript 不仅有各种类型的运行时错误（TypeError、ReferenceError、SyntaxError 等），它的语法中也定义了一些编译时错误。
 
+在编译阶段发现的代码错误叫作“早期错误”（early error）。语法错误是早期错误的一种（如 `a=, `）。另外，语法正确但不符合语法规则的情况也存在。
+
+这些错误在代码执行之前是无法用 `try..catch` 来捕获的，相反，它们还会导致解析/编译失败。
+>规范没有明确规定浏览器（和开发工具）应该如何处理报错，因此下面的报错处理（包括错误类型和错误信息）在不同的浏览器中可能会有所不同。
+
+举个简单的例子：正则表达式常量中的语法。这里 JavaScript 语法没有问题，但非法的正则表达式也会产生早期错误：
+```javascript
+var a = /+foo/; // 错误
+```
+语规定赋值对象必须是一个标识符（identifier，或者 ES6 中的解构表达式），因此下面的 `42` 会报错：
+```javascript
+var a;
+42 = a; // 错误法
+```
+ES5 规范的严格模式定义了很多早期错误。比如在严格模式中，函数的参数不能重名：
+```javascript
+function foo(a, b, a) { } // 没问题
+ 
+function bar(a, b, a) { "use strict" } // 错误
+```
+再如，对象常量不能包含多个同名属性：
+```javascript
+(function() {
+	"use strict"
+	
+	var a = {
+		b: 42,
+		b: 43
+	}; // 错误
+})();
+```
+>从语义角度来说，这些错误并非词法错误，而是语法错误，因为它们在词法上是正确的。只不过由于没有 `GrammarError` 类型，一些浏览器选择用 `SyntaxError` 来代替。
+
+## 提前使用变量
+
+ES6 规范定义了一个新概念，叫作 TDZ（Temporal Dead Zone，暂时性死区）。
+
+TDZ 指的是由于代码中的变量还没有初始化而不能被引用的情况。
+
+对此，最直观的例子是 ES6 规范中的 `let` 块作用域：
+```javascript
+{
+	a = 2; // ReferenceError
+	let a;
+}
+```
+`a = 2` 试图在 `let a` 初始化 `a` 之前使用该变量（其作用域在 `{ .. }` 内），这里就是 `a` 的 TDZ，会产生错误。
+
+有意思的是，对未声明变量使用 `typeof` 不会产生错误（参见第 1 章），但在 TDZ 中却会报错：
+```javascript
+{
+	typeof a; // undefined
+	typeof b; // ReferenceError! (TDZ)
+	let b;
+}
+```
 
 
 
