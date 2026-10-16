@@ -865,6 +865,317 @@ TDZ 指的是由于代码中的变量还没有初始化而不能被引用的情�
 	let b;
 }
 ```
+# 5.5 函数参数
+
+另一个 TDZ 违规的例子是 ES6 中的参数默认值（参见本系列的《你不知道的 JavaScript（下卷）》的 “ES6 & Beyond” 部分）：
+```javascript
+var b = 3;
+
+function foo( a = 42, b = a + b + 5) {
+	// ..
+}
+```
+`b = a + b + 5` 在参数 `b`（`=` 右边的 `b`，而不是函数外的那个）的 TDZ 中访问 `b`。所以会出错。而访问 `a` 却没有问题，因为此时刚好跨出了参数 `a` 的 TDZ。
+
+在 ES6 中，如果参数被省略或者值为 `undefined`，则取该参数的默认值：
+```javascript
+function foo( a = 42, b = a + 1 ) {
+	console.log(a, b);
+}
+
+foo(); // 42 43
+foo(undefined);// 42 43
+foo(5); // 5 6
+foo(void 0, 7); // 42 7
+foo(null); // null 1
+```
+>表达式 `a + 1` 中 `null` 被强制类型转换为 `0`。详情请参见第 4 章节。
+
+对 ES6 中的参数默认值而言，参数被省略或被赋值为 `undefined` 效果都一样，都是取该参数的默认值。然而某些情况下，它们之间还是有区别的：
+```javascript
+function foo(a = 42, b = a + 1) {
+	console.log(
+		arguments.length, a, b
+		arguments[0], arguments[1]
+	);
+}
+
+foo(); // 0 42 43 undefined undefined
+foo(10); // 1 10 11 10 undefined
+foo(10, undefined); // 2 10 11 10 undefined
+foo(10, null); // 2 10 null 10 null
+```
+虽然 `a` 和 `b` 都有默认值，但是函数不带参数时，`arguments` 数组为空。
+
+相反，如果向函数传递 `undefined` 值，则 `arguments` 数组中会出现一个值为 undefined 的单元，而不是默认值。
+
+ES6 参数默认值会导致 `arguments` 数组和相对应的命名参数之间出现偏差，ES5 也会出现这种情况：
+```javascript
+function foo(a) {
+	a = 42;
+	console.log(arguments[0]);
+}
+
+foo(2); // 42（linked）
+foo(); // undefined（not linked）
+```
+向函数传递参数时，`arguments` 数组中的对应单元会和命名参数建立关联（linkage）以得到相同的值。相反，不传递参数就不会建立关联。
+
+但是，严格模式中并没有建立关联这一说：
+```javascript
+function foo(a) {
+	"use strict"
+	a = 42;
+	console.log(arguments[0]);
+}
+
+foo(2); // 2 (not linked)
+foo(); // undefined (not linked)
+```
+因此，在开发中不要依赖这种关联机制。实际上，它是 JavaScript 语言引擎底层实现的一个抽象泄露（leaky abstraction），并不是语言本身的特性。
+
+`arguments` 数组已经被废止（特别是在 ES6 引入剩余参数 `...` 之后，参见本系列的《你不知道的 JavaScript（下卷）》的 “ES6 & Beyond” 部分），不过它并非一无是处。
+
+在 ES6 之前，获得函数所有参数的唯一途径就是 `arguments` 数组。此外，即使将命名参数和 `arguments` 数组混用也不会出错，只需遵守一个原则，即不要同时访问命名参数和其对应的 `arguments` 数组单元。
+```javascript
+function foo(a) {
+	console.log(a + arguments[1]); // 安全
+}
+
+foo(10, 32); // 42
+```
+# 5.6 try..finally
+
+`try..catch` 对我们来说可能已经非常熟悉了。但你是否知道 `try` 可以和 `catch` 或者 `finally` 配对使用，并且必要时两者可同时出现？
+
+`finally` 中的代码总是会在 `try` 之后执行，如果有 `catch` 的话则在 `catch` 之后执行。也可以将 `finally` 中的代码看作一个回调函数，即无论出现什么情况最后一定会被调用。
+
+如果 `try` 中有 `return` 语句会出现什么情况呢？`return` 会返回一个值，那么调用该函数并得到返回值的代码是在 `finally` 之前还是之后执行呢？
+```javascript
+function foo() {
+	try {
+		return 42;
+	}
+	finally {
+		console.log("Hello");
+	}
+	
+	console.log("neven runs");
+}
+
+console.log(foo());
+// Hello
+// 42
+```
+这里 `return 42` 先执行，并将 `foo()` 函数的返回值设置为 `42`。然后 `try` 执行完毕，接着执行 `finally`。最后 `foo()` 函数执行完毕，`console.log(..)` 显示返回值。
+
+`try` 中的 `throw` 也是如此：
+```javascript
+function foo() {
+	try {
+		throw 42;
+	}
+	finally {
+		console.log("Hello");
+	}
+	
+	console.log("never runs");
+}
+
+console.log(foo());
+// Hello
+// Uncaught Excepition: 42
+```
+如果 `finally` 中抛出异常（无论是有意还是无意），函数就会在此处终止。如果此前 `try` 中已经有 `return` 设置了返回值，则该值会被丢弃：
+```javascript
+function foo() {
+	try {
+		return 42;
+	}
+	finally {
+		throw "Oops!";
+	}
+	console.log("never runs");
+}
+
+console.log(foo());
+// Uncaught Exception: Oops!
+```
+`continue` 和 `break` 等控制语句也是如此：
+```javascript
+for (var i = 0; i < 10; i++) {
+	try {
+		continue;
+	}
+	finally {
+		console.log(i);
+	}
+}
+
+// 0 1 2 3 4 5 6 7 8 9
+```
+>ES6 中新加入了 `yield`（参见本书的 “异步和性能” 部分），可以将其视为 `return` 的中间版本。然而与 `return` 不同的是，`yield` 在 generator（ES6 的另一个新特性）重新开始时才结束，这意味着 `try { .. yield .. }` 并未结束，因此 `finally` 不会在 `yield` 之后立即执行。
+
+`finally` 中的 `return` 会覆盖 `try` 和 `catch` 中 `return` 的返回值：
+```javascript
+function foo() {
+	try {
+		return 42;
+	}
+	finally {
+		// 没有返回语句，所以没有覆盖
+	}
+}
+
+function bar() {
+	try {
+		return 42;
+	}
+	finally {
+		// 覆盖前面的 return 42
+		return;
+	}
+}
+
+function baz() {
+	try {
+		return 42;
+	}
+	finally {
+		// 覆盖前面的 return 42
+		return "Hello";
+	}
+}
+
+foo(); // 42
+bar(); // undefined
+baz(); // Hello
+```
+事实上，还可以将 `finally` 和带标签的 `break` 混合使用（参见 5.1.3 节）。例如：
+```javascript
+function foo() {
+	bar: {
+		try {
+			return 42;
+		}
+		finally {
+			// 跳出标签为 bar 的代码块
+			break bar;
+		}
+	}
+	
+	console.log("Crazy");
+	return "Hello";
+}
+
+console.log(foo());
+// Crazy
+// Hello
+```
+但切勿这样操作。利用 `finally` 加带标签的 `break` 来跳过 `return` 只会让代码变得晦涩难懂，即使加上注释也是如此。
+# 5.7 switch
+
+现在来简单介绍一下 `switch`，可以把它看作 `if..else if..else..` 的简化版本：
+```javascript
+switch (a) {
+	case 2:
+		// 执行一些代码
+		break;
+	case 42:
+		// 执行另外一些代码
+		break;
+	default:
+		// 执行缺省代码
+}
+```
+这里 `a` 与 `case` 表达式逐一进行比较。如果匹配就执行该 `case` 中的代码，直到 `break` 或者 `switch` 代码块结束。
+
+这看似并无特别之处，但其中存在一些不太为人所知的陷阱。
+
+首先，`a` 和 `case` 表达式的匹配算法与 `===`（参见第 4 章）相同。通常 `case` 语句中的 `switch` 都是简单值，所以这样并没有问题。
+
+然而，有时可能会需要通过强制类型转换来进行相等比较（即 `==`，参见第 4 章），这时就需要做一些特殊处理：
+```javascript
+var a = "42";
+
+switch (true) {
+	case a == 10:
+		console.log("10 or '10'");
+		break;
+	case a == 42:
+		console.log("42 or '42'");
+		break;
+	default:
+		// 永远执行不到这里
+}
+
+// 42 or '42'
+```
+除简单值以外，`case` 中还可以出现各种表达式，它会将表达式的结果值和 `true` 进行比较。因为 `a == 42` 的结果为 `true`，所以条件成立。
+
+尽管可以使用 `==`，但 `switch` 中 `true` 和 `true` 之间仍然是严格相等比较。即如果 `case` 表达式的结果为真值，但不是严格意义上的 `true`（参见第 4 章），则条件不成立。所以，在这里使用 `||` 和 `&&` 等逻辑运算符就很容易掉进坑里：
+```javascript
+var a = "hello world";
+var b = 10;
+
+switch (true) {
+	case (a || b == 10):
+		// 永远执行不到这里
+		break;
+	default:
+		console.log("Oops");
+}
+// Oops
+```
+因为 `(a || b == 10)` 的结果是 `"hello world"` 而非 `true`，所以严格相等比较不成立。此时可以通过强制表达式返回 `true` 或 `false`，如 `case !!(a || b == 10):`（参见第 4 章）。
+
+最后，`default` 是可选的，并非必不可少（虽然惯例如此）。`break` 相关规则对 `default` 仍然适用：
+```javascript
+var a = 10;
+
+switch (a) {
+	case 1:
+	case 2:
+		// 永远执行不到这里
+	default:
+		console.log("default");
+	case 3:
+		console.log("3");
+		break;
+	case 4:
+		console.log("4");
+}
+
+// default
+// 3
+```
+>正如之前介绍的，`case` 中的 `break` 也可以带标签。
+
+上例中的代码是这样执行的，首先遍历并找到所有匹配的 `case`，如果没有匹配则执行 `default` 中的代码。因为其中没有 `break`，所以继续执行已经遍历过的 `case 3` 代码块，直到 `break` 为止。
+
+理论上来说，这种情况在 JavaScript 中是可能出现的，但在实际情况中，开发人员一般不会这样来编码。如果确实需要这样做，就应该仔细斟酌并做好注释。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
